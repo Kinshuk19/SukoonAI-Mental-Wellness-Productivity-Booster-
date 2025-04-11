@@ -1,130 +1,180 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Check } from "lucide-react";
+import { Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
+import { useState } from 'react';
+import { useToast } from '@/components/ui/use-toast';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+
+const getPlans = (isYearly: boolean) => [
+  {
+    name: 'Free',
+    price: '0',
+    description: 'Basic features for personal use',
+    features: [
+      'Basic chat with AI',
+      'Limited messages per day',
+      'Standard response time',
+      'Basic mood tracking',
+      'Community support'
+    ],
+    buttonText: 'Get Started',
+    popular: false,
+    period: isYearly ? '/year' : '/month'
+  },
+  {
+    name: 'Nirvana',
+    price: isYearly ? '4999' : '499',
+    description: 'Advanced features for deeper support',
+    features: [
+      'Unlimited AI chat sessions',
+      'Priority response time',
+      'Advanced mood analytics',
+      'Personalized insights',
+      'Guided meditation sessions',
+      'Nirvana community access',
+      '24/7 priority support'
+    ],
+    buttonText: 'Go Nirvana',
+    popular: true,
+    period: isYearly ? '/year' : '/month',
+    savings: isYearly ? 'Save ₹989' : null
+  }
+];
 
 export default function PricingSection() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
   const [isYearly, setIsYearly] = useState(false);
+  const plans = getPlans(isYearly);
 
-  const monthlyPrice = 499;
-  const yearlyPrice = 4999;
-  const monthlyInYearly = Math.round(yearlyPrice / 12);
-  const savings = Math.round((monthlyPrice * 12 - yearlyPrice) / (monthlyPrice * 12) * 100);
+  const handleSubscribe = async (planName: string) => {
+    if (!user) {
+      // Redirect to sign in if not authenticated
+      window.location.href = '/signin';
+      return;
+    }
+
+    if (planName === 'Nirvana') {
+      try {
+        setLoading(true);
+        const token = await user.getIdToken();
+        
+        const response = await fetch('/api/create-checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            isYearly
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to create checkout session');
+        }
+
+        // Redirect to Stripe Checkout
+        window.location.href = data.url;
+      } catch (error) {
+        console.error('Error:', error);
+        toast({
+          title: "Error",
+          description: "Failed to start checkout process. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
 
   return (
-    <section className="py-16">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="text-center mb-12"
-      >
-        <h2 className="text-3xl md:text-4xl font-bold mb-4">Simple Transparent Pricing</h2>
-        <p className="text-xl text-muted-foreground">
-          Choose your preferred billing cycle
-        </p>
-      </motion.div>
-
-      <div className="flex items-center justify-center gap-4 mb-12">
-        <motion.div
-          animate={{ color: !isYearly ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))" }}
-          className="text-lg font-medium"
-        >
-          Monthly
-        </motion.div>
-        <Switch
-          checked={isYearly}
-          onCheckedChange={setIsYearly}
-          className="data-[state=checked]:bg-primary"
-        />
-        <motion.div
-          animate={{ color: isYearly ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))" }}
-          className="text-lg font-medium flex items-center gap-2"
-        >
-          Yearly
-          {isYearly && (
-            <motion.span
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="inline-block px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-sm rounded-full"
-            >
-              Save {savings}%
-            </motion.span>
-          )}
-        </motion.div>
-      </div>
-
-      <motion.div
-        layout
-        className="max-w-lg mx-auto rounded-2xl overflow-hidden bg-card shadow-xl border"
-      >
-        <div className="p-8">
-          <h3 className="text-2xl font-bold text-center mb-6">Premium Plan</h3>
-          <div className="flex justify-center items-baseline gap-1 mb-4">
-            <span className="text-3xl font-bold">₹</span>
-            <motion.span
-              key={isYearly ? 'yearly' : 'monthly'}
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-6xl font-bold"
-            >
-              {isYearly ? yearlyPrice : monthlyPrice}
-            </motion.span>
-            <span className="text-lg text-muted-foreground">/{isYearly ? 'year' : 'month'}</span>
-          </div>
-
-          {isYearly && (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center text-muted-foreground mb-6"
-            >
-              Just ₹{monthlyInYearly}/month when billed yearly
-            </motion.p>
-          )}
-
-          <ul className="space-y-4 mb-8">
-            <li className="flex items-center gap-3">
-              <Check className="h-5 w-5 text-green-500" />
-              <span>Unlimited AI conversations</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <Check className="h-5 w-5 text-green-500" />
-              <span>Priority 24/7 support</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <Check className="h-5 w-5 text-green-500" />
-              <span>Advanced mindfulness tools</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <Check className="h-5 w-5 text-green-500" />
-              <span>Personalized recommendations</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <Check className="h-5 w-5 text-green-500" />
-              <span>Progress tracking & insights</span>
-            </li>
-          </ul>
-
-          <Button 
-            size="lg" 
-            className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
-            onClick={() => alert('Premium subscriptions coming soon!')}
-          >
-            Get Started Now
-          </Button>
-        </div>
-
-        <div className="px-8 py-4 bg-muted/50">
-          <p className="text-center text-sm text-muted-foreground">
-            30-day money-back guarantee. No questions asked.
+    <section className="py-12" id="pricing">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            Simple, Transparent Pricing
+          </h2>
+          <p className="mt-4 text-lg text-gray-600">
+            Choose the plan that best fits your needs
           </p>
+          
+          <div className="flex items-center justify-center gap-4 mt-8">
+            <Label htmlFor="billing-toggle" className={!isYearly ? 'font-semibold' : ''}>Monthly</Label>
+            <Switch
+              id="billing-toggle"
+              checked={isYearly}
+              onCheckedChange={setIsYearly}
+              className="data-[state=checked]:bg-blue-600"
+            />
+            <div className="flex items-center gap-2">
+              <Label htmlFor="billing-toggle" className={isYearly ? 'font-semibold' : ''}>Yearly</Label>
+              {isYearly && (
+                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                  Save 17%
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-      </motion.div>
+
+        <div className="mt-12 grid gap-8 lg:grid-cols-2 lg:gap-12">
+          {plans.map((plan) => (
+            <div
+              key={plan.name}
+              className={`relative flex flex-col rounded-2xl border p-8 shadow-sm ${
+                plan.popular ? 'border-blue-600 shadow-blue-100' : ''
+              }`}
+            >
+              {plan.popular && (
+                <div className="absolute -top-4 left-0 right-0 mx-auto w-fit rounded-full bg-blue-600 px-4 py-1 text-sm font-medium text-white">
+                  Most Popular
+                </div>
+              )}
+
+              <div className="mb-6">
+                <h3 className="text-xl font-bold">{plan.name}</h3>
+                <div className="mt-4 flex items-baseline gap-1">
+                  <span className="text-4xl font-bold tracking-tight">₹{plan.price}</span>
+                  <span className="text-gray-500">{plan.period}</span>
+                  {plan.savings && (
+                    <span className="ml-2 inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                      {plan.savings}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-gray-600">{plan.description}</p>
+              </div>
+
+              <ul className="mb-8 space-y-4 flex-grow">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex items-center gap-3">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <Button
+                onClick={() => handleSubscribe(plan.name)}
+                disabled={loading}
+                className={`w-full ${
+                  plan.popular ? 'bg-blue-600 hover:bg-blue-700' : ''
+                }`}
+              >
+                {loading ? 'Processing...' : plan.buttonText}
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
   );
 } 
